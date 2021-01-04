@@ -1,0 +1,142 @@
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Example of plotting live data with websockets and highcharts</title>
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="text/javascript"> 
+    var totalmsg = 0;
+    var chart;
+
+    function onMessageArrived(message) {
+      totalmsg++;
+      document.getElementById('counter').innerHTML = totalmsg;
+      //console.log(message);
+      var jobj
+      try {
+        jobj = JSON.parse(message);
+      } catch(ex){
+        return null;
+      }
+      var myEpoch = jobj.created
+      var myliveEpoch = new Date().getTime(); //get current epoch time
+      var thenum = jobj.readings[0].value
+      var plotMqtt = [myEpoch, Number(thenum)]; //create the array
+      var plotliveMqtt = [myliveEpoch, Number(thenum)]; //create the array
+      document.getElementById('getValue').innerHTML = thenum;
+      plot(plotMqtt, 0);	//send it to the plot function
+      plot(plotliveMqtt, 1);	//send it to the plot function
+    };
+
+    //this adds the plots to the chart
+    function plot(point, chartno) {
+      //console.log(point);
+
+      var shift = false;
+          //shift = series.data.length > 100; // shift if the series is
+                                               // longer than 100
+      // add the point
+      chart.series[chartno].addPoint(point, true, shift);
+    };
+
+    //settings for the chart
+    $(document).ready(function() {
+        chart = new Highcharts.Chart({
+            chart: {
+                renderTo: 'chartcontainer',
+		zoomType: 'x',
+                defaultSeriesType: 'spline'
+            },
+            title: {
+                text: 'Plotting Live websockets data from a MQTT topic'
+            },
+            subtitle: { text: 'endpoint: '},
+            xAxis: {
+                type: 'datetime',
+                tickPixelInterval: 50,
+                maxZoom: 20 * 1000
+            },
+            yAxis: {
+                minPadding: 0.2,
+                maxPadding: 0.2,
+                tickPixelInterval: 30,
+                title: {
+                    text: 'Value',
+                    margin: 30
+                }
+            },
+            series: []
+        });
+
+        //create new data series for the chart
+        var newseries = {
+          id: 0,
+          name: "Created time",
+          data: []
+        };
+        chart.addSeries(newseries); //add the series
+
+        var newliveseries = {
+          id: 1,
+          name: "Received time",
+          data: []
+        };
+        chart.addSeries(newliveseries); //add the series
+    });
+  </script>
+
+  <script src="http://code.highcharts.com/stock/highstock.js"></script>
+  <script src="http://code.highcharts.com/stock/modules/exporting.js"></script>
+</head>
+<body>
+<!-- Start the javascript ball rolling and connect to the mqtt broker
+<body onload="connect();">
+-->
+  <div class="container">
+    <div class="row">
+      <div class="col-4">
+        <label>Received :
+          <span id="counter">0</span>
+        </label>
+        <br>
+        <label>Value :
+          <span id="getValue">0</span>
+        </label>
+      </div>
+    </div>
+    <div id="chartcontainer" style="height: 500px; min-width: 500px"></div><!-- this the placeholder for the chart-->
+  </div>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+  <script>
+      var socket = io.connect();
+
+      socket.on('connect', function(){
+        console.log('[%s]on connect...', socket.id);
+      });
+/*
+      socket.on('event', function(data){
+        console.log('[%s]on event...', socket.id, data);
+      });
+*/
+      socket.on('news', function(data){
+	chart.setTitle(null, {text: 'Aliyun endpoint: ' + data});   
+        //console.log('[%s]on news...', socket.id, data);
+        //socket.emit('event', {
+        //  msg: 'test', ts: new Date()
+        //});
+      });
+
+      socket.on('ali-edgex-shadow', function(data){
+        console.log('[%s]on ali edgex shadow...', socket.id, JSON.parse(data));
+        onMessageArrived(data)
+      });
+
+      socket.on('disconnect', function(){
+        console.log('[%s]on disconnect....', socket.id);
+      });
+  </script>
+</body>
+</html>
